@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="sbt: org.mockito:mockito-inline:2.8.47:jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/org.mockito/mockito-inline/jars/mockito-inline-2.8.47.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.ivy2/cache/org.mockito/mockito-inline/srcs/mockito-inline-2.8.47-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
