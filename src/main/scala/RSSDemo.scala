@@ -20,16 +20,11 @@ object RSSDemo {
   }
 
   def main(args: Array[String]) {
-    // TODO: download and try to run(ALL MEMBERS)
-    // TODO: solve the problem with empty content
     val durationSeconds = 10
     val conf = new SparkConf().setAppName("RSS Spark Application").setIfMissing("spark.master", "local[*]")
     val sc = new SparkContext(conf)
     val ssc = new StreamingContext(sc, Seconds(durationSeconds))
     sc.setLogLevel("ERROR")
-
-    // TODO: fit the model
-    // SMS: Azat, choose the relevant model(Large Movie Review Dataset/Sentiment Tree Bank/UCI Sentiment Labelled Sentences/Twitter Sentiment) and try to learn it
 
     val datasetTrainPosDir = "dataset/train/pos"
     val datasetTrainNegDir = "dataset/train/neg"
@@ -92,12 +87,12 @@ object RSSDemo {
     val accuracy = evaluator.evaluate(predictions)
     println(accuracy)
 
-    return
 
     val urlCSV = args(0)
     val urls = urlCSV.split(",")
-    // https://queryfeed.net/twitter?q=dogs&title-type=user-name-both&order-by=recent&geocode=
-    // https://queryfeed.net/twitter?q=%23weather&title-type=tweet-text-full&order-by=recent&geocode=
+    // https://queryfeed.net/twitter?q=%23today&title-type=tweet-text-full&order-by=recent&geocode=
+    // TODO: this query gave info for #today and write tweet text in the title, so now we don't need context.(!!! use it !!! you can change hashtag)
+    // SMS: Ruslan, run test data using fitted model and check by hands how our model can predict the result!
     urls.foreach(url => println("URL=" + url))
     val stream = new RSSInputDStream(urls, Map[String, String](
       "User-Agent" -> "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
@@ -107,13 +102,11 @@ object RSSDemo {
       rdd.foreach(entry => {
         //TODO: normalize input data and predict
         // normalize = lowercase + delete shitty punctuation -> to vectors
-        println("Title=" + entry.title)
         println("Uri=" + entry.uri)
-        print("content is ->")
-        // TODO: look, content is empty
-        entry.content.foreach(entry1 => {
-          print(entry1.value)
-        })
+        println("Title=" + entry.title)
+        var temp = entry.title.toString().toLowerCase
+        println(temp)
+
         println()
       })
       val spark = SparkSession.builder().appName(sc.appName).getOrCreate()
