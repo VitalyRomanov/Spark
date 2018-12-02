@@ -1,11 +1,11 @@
 import com.github.catalystcode.fortis.spark.streaming.rss.RSSInputDStream
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import java.io.File
 
-import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{HashingTF, IDF, Tokenizer}
@@ -26,7 +26,6 @@ object RSSDemo {
     val sc = new SparkContext(conf)
     val ssc = new StreamingContext(sc, Seconds(durationSeconds))
     sc.setLogLevel("ERROR")
-
     val datasetTrainPosDir = "dataset/train/pos"
     val datasetTrainNegDir = "dataset/train/neg"
     var trainData: ListBuffer[(Double, String)] = ListBuffer()
@@ -58,20 +57,21 @@ object RSSDemo {
     val pipeline = new Pipeline().setStages(Array(tokenizer, hashingTF, idf, lr))
 
     println("Fitting")
-    val model = pipeline.fit(training)
+        val model = pipeline.fit(training)
     println("Fitted")
 
     val datasetTestPosDir = "dataset/test/pos"
     val datasetTestNegDir = "dataset/test/neg"
     var testData: ListBuffer[(Double, String)] = ListBuffer()
     id = 0
-
+    println("1")
     getListOfFiles(datasetTestPosDir).foreach(file => {
       val source = Source.fromFile(file)
       testData.append((1.0, source.getLines().mkString))
       source.close()
       id += 1
     })
+    println("2")
 
     getListOfFiles(datasetTestNegDir).foreach(file => {
       val source = Source.fromFile(file)
@@ -79,14 +79,16 @@ object RSSDemo {
       source.close()
       id += 1
     })
+    println("3")
 
     val test = spark.createDataFrame(testData.toList).toDF("label", "text")
     //    print(test + "test data ")
-    val predictions = model.transform(test)
+//    val predictions = model.transform(test)
     val evaluator = new BinaryClassificationEvaluator().setLabelCol("label").setRawPredictionCol("prediction").setMetricName("areaUnderROC")
 
-    val accuracy = evaluator.evaluate(predictions)
+ //   val accuracy = evaluator.evaluate(predictions)
     //println(accuracy)
+    println("4")
 
 
     val urlCSV = args(0)
@@ -100,20 +102,52 @@ object RSSDemo {
     ), ssc, StorageLevel.MEMORY_ONLY, pollingPeriodInSeconds = durationSeconds)
 
     stream.foreachRDD(rdd => {
+  //    rdd.foreach(entry => {
+        //TODO: normalize input data and predict
+        // normalize = lowercase + delete shitty punctuation -> to vectors
+//        prnintln("Uri=" + entry.uri)
+//        pritln("Title=" + entry.title)
+//        var temp = entry.title.toString().toLowerCase
+//        println(temp)
+//        println()
+        val spark = SparkSession.builder().appName(sc.appName).getOrCreate()
+        import spark.sqlContext.implicits._
+        rdd.toDS().select("title").collect().foreach(s => transform(s.toString()))
+      //})
+    })
+    def transform(s: String) {
+      var replaced = s.slice(1, s.length - 1)
+      replaced = replaced.replaceAll("http(.*?)\\s", "")
+
+      var df = preprocessString(replaced)
+
+
+      val prediction = model.transform(df)
+
+      println("-------------------------------------------")
+      //df.show()
+      df.select("text").collect().foreach(s => println(s.toString().slice(1, s.toString().length - 1)))
+      prediction.select("prediction").collect().foreach(s => println(s.toString().slice(1, s.toString().length - 1)))
+      println("-------------------------------------------")
+    }
+
+    def preprocessString(string: String): DataFrame = {
+      // Remove punctuation
+      val processedString = string.replaceAll("[^a-zA-Z ]", "")
+      // Remove repeating letters
+      val processedString2 = processedString.replaceAll("(.)\\1{1,}", "$1")
+      // Set text to lowercase
+      val processedString3 = processedString2.toLowerCase()
+
+      // Create dataframe from a processed string
+      val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 
       val spark = SparkSession.builder().appName(sc.appName).getOrCreate()
-      import spark.sqlContext.implicits._
+      import spark.implicits._
 
-      var data = rdd.toDS().select("title")
-//      data.collect().foreach(d => println(d.toString()))
-      var y_pred = model.transform(data)
-
-
-      println('---------------------------)
-      y_pred.select("prediction").collect().foreach(s => println(s.toString().slice(1, s.toString().length - 1)))
-      //rdd.toDS().show()
-      println('----------------------)
-    })
+      val processedDF = sqlContext.sparkContext.parallelize(Seq(processedString3)).toDF("text")
+      return processedDF
+    }
 
     // run forever
     ssc.start()
