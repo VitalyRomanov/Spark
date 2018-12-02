@@ -20,6 +20,7 @@ object RSSDemo {
   }
 
   def main(args: Array[String]) {
+    println("LETS START!")
     val durationSeconds = 10
     val conf = new SparkConf().setAppName("RSS Spark Application").setIfMissing("spark.master", "local[*]")
     val sc = new SparkContext(conf)
@@ -28,7 +29,7 @@ object RSSDemo {
 
     val datasetTrainPosDir = "dataset/train/pos"
     val datasetTrainNegDir = "dataset/train/neg"
-    var trainData : ListBuffer[(Double, String)] = ListBuffer()
+    var trainData: ListBuffer[(Double, String)] = ListBuffer()
     var id = 0
 
     getListOfFiles(datasetTrainPosDir).foreach(file => {
@@ -62,7 +63,7 @@ object RSSDemo {
 
     val datasetTestPosDir = "dataset/test/pos"
     val datasetTestNegDir = "dataset/test/neg"
-    var testData : ListBuffer[(Double, String)] = ListBuffer()
+    var testData: ListBuffer[(Double, String)] = ListBuffer()
     id = 0
 
     getListOfFiles(datasetTestPosDir).foreach(file => {
@@ -80,12 +81,12 @@ object RSSDemo {
     })
 
     val test = spark.createDataFrame(testData.toList).toDF("label", "text")
-
+    //    print(test + "test data ")
     val predictions = model.transform(test)
     val evaluator = new BinaryClassificationEvaluator().setLabelCol("label").setRawPredictionCol("prediction").setMetricName("areaUnderROC")
 
     val accuracy = evaluator.evaluate(predictions)
-    println(accuracy)
+    //println(accuracy)
 
 
     val urlCSV = args(0)
@@ -93,25 +94,25 @@ object RSSDemo {
     // https://queryfeed.net/twitter?q=%23today&title-type=tweet-text-full&order-by=recent&geocode=
     // TODO: this query gave info for #today and write tweet text in the title, so now we don't need context.(!!! use it !!! you can change hashtag)
     // SMS: Ruslan, run test data using fitted model and check by hands how our model can predict the result!
-    urls.foreach(url => println("URL=" + url))
+    //urls.foreach(url => println("URL=" + url))
     val stream = new RSSInputDStream(urls, Map[String, String](
       "User-Agent" -> "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
     ), ssc, StorageLevel.MEMORY_ONLY, pollingPeriodInSeconds = durationSeconds)
 
     stream.foreachRDD(rdd => {
-      rdd.foreach(entry => {
-        //TODO: normalize input data and predict
-        // normalize = lowercase + delete shitty punctuation -> to vectors
-        println("Uri=" + entry.uri)
-        println("Title=" + entry.title)
-        var temp = entry.title.toString().toLowerCase
-        println(temp)
 
-        println()
-      })
       val spark = SparkSession.builder().appName(sc.appName).getOrCreate()
       import spark.sqlContext.implicits._
-      rdd.toDS().show()
+
+      var data = rdd.toDS().select("title")
+//      data.collect().foreach(d => println(d.toString()))
+      var y_pred = model.transform(data)
+
+
+      println('---------------------------)
+      y_pred.select("prediction").collect().foreach(s => println(s.toString().slice(1, s.toString().length - 1)))
+      //rdd.toDS().show()
+      println('----------------------)
     })
 
     // run forever
